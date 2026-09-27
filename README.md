@@ -84,3 +84,25 @@ rm -r ~/.local/share/gnome-shell/extensions/layout-safe-window-anim@local
 ## License
 
 MIT License。见 [LICENSE](LICENSE)。
+
+## 可调参数
+
+`extension.js` 顶部：
+
+```js
+// 最小化动画"结束时"窗口的缩放系数：越小，窗口在消失前收得越紧。
+// 只作用于 minimize 方向（还原动画不受影响）。
+const MINIMIZE_END_SCALE = 0.6;
+
+// 最小化落点的横向修正：Shell 给的落点偏图标左侧一点，正值把它往右挪。
+const MINIMIZE_END_OFFSET_X = 16;
+```
+
+改完重启 GNOME Shell 生效：
+
+```bash
+kill -TERM $(systemctl --user show org.gnome.Shell@x11.service -p MainPID --value)
+```
+
+说明：GNOME 会把每个窗口的结束尺寸按图标大小归一化（实测 900px 与 1750px 的窗口
+都缩到约 74px），所以落点修正只需要一个固定值，不需要按窗口宽度计算。
