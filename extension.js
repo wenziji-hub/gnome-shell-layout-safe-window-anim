@@ -7,6 +7,14 @@
 
 const Main = imports.ui.main;
 
+// 最小化动画"结束时"窗口的缩放系数：越小，窗口在消失前收得越紧。
+// 原始结束缩放由 Shell 决定（本机实测约 0.137 x 0.065），乘上这个系数即可再缩小。
+// 只作用于 minimize 方向（还原动画不受影响，否则窗口会以很小的尺寸恢复、然后跳回原样）。
+const MINIMIZE_END_SCALE = 0.6;
+
+// 最小化落点的横向修正：Shell 给的落点偏图标左侧一点，正值把它往右挪。
+const MINIMIZE_END_OFFSET_X = 16;
+
 let originalShouldAnimateActor = null;
 
 function pathName() {
@@ -65,6 +73,8 @@ function install(actor, path) {
         let initialTranslationX = 0;
         let initialTranslationY = 0;
         let destinationTranslationX = targetX - baseX;
+        if (path === 'minimize')
+            destinationTranslationX += MINIMIZE_END_OFFSET_X;   // 落点右移，对准图标
         let destinationTranslationY = targetY - baseY;
         if (path === 'unminimize') {
             initialTranslationX = baseX - targetX;
@@ -81,6 +91,13 @@ function install(actor, path) {
         delete translated.y;
         translated.translation_x = destinationTranslationX;
         translated.translation_y = destinationTranslationY;
+
+        if (path === 'minimize') {
+            if (translated.scale_x !== undefined)
+                translated.scale_x *= MINIMIZE_END_SCALE;
+            if (translated.scale_y !== undefined)
+                translated.scale_y *= MINIMIZE_END_SCALE;
+        }
 
         const stopped = params.onStopped;
         translated.onStopped = () => {
@@ -100,7 +117,9 @@ function install(actor, path) {
                 stopped();
         };
 
-        log('[layout-safe-window-anim] ' + path + ' target=' +
+        log('[layout-safe-window-anim] ' + path +
+            ' scale=' + params.scale_x + 'x' + params.scale_y +
+            ' -> ' + translated.scale_x + 'x' + translated.scale_y + ' target=' +
             targetX + ',' + targetY + ' base=' + baseX + ',' + baseY +
             ' initial=' + initialTranslationX + ',' + initialTranslationY +
             ' destination=' + translated.translation_x + ',' +
