@@ -1,1 +1,9 @@
-{"uuid":"layout-safe-window-anim@local","name":"Layout Safe Window Animation","description":"Use transform translations for GNOME 42 minimize/restore movement","shell-version":["42"],"version":1}
+{
+  "uuid": "layout-safe-window-anim@local",
+  "name": "Layout Safe Window Animation",
+  "description": "Use transform translations for GNOME 42 minimize/restore movement",
+  "shell-version": [
+    "42"
+  ],
+  "version": 2
+}
