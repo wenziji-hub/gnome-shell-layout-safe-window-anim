@@ -6,12 +6,20 @@
 
 GNOME 42 的原生窗口动画在同一个 `actor.ease()` 中同时动画布局位置 `x/y` 和绘制缩放 `scale`。`x/y` 会触发布局 allocation，`scale` 属于绘制变换。Mutter 偶尔会先提交最终窗口位置，而缩放仍停留在任务栏图标大小，于是产生一帧“最终位置 + 图标大小”的错误画面。
 
-这个扩展只改变移动的实现方式：
+这个扩展接管最小化 / 还原这两个动画：屏蔽 GNOME 自己连在 `global.window_manager` 的
+`minimize` / `unminimize` 上的 handler，换成本扩展的实现。只改变移动的实现方式：
 
 - 保留 GNOME 原来的 400ms 时长、动画曲线和缩放效果；
 - 最小化时保持布局位置稳定，用 `translation_x/y` 移向任务栏图标；
 - 还原时先固定布局到最终窗口位置，用反向平移保持画面在图标处，再让平移归零；
-- 清理旧的 `x/y` 和平移 transition，避免被打断的旧动画覆盖新状态。
+- 收尾仍交给 GNOME 的 `_minimizeWindowDone()` / `_unminimizeWindowDone()`，
+  `kill-window-effects` 等其它代码路径照常工作。
+
+顺带修了 GNOME 原版的两处毛病：
+
+- 还原动画还没放完就被最小化时，原版的旧回调会 `remove_all_transitions()`，
+  把新开始的最小化动画一起杀掉（窗口直接消失）。这里给每个窗口的动画编号，过期回调只补记账、不动画面；
+- 找不到显示器时原版调用 `_minimizeWindowDone()` 不带参数，窗口会卡在"最小化中"。
 
 因此它不需要关闭桌面动画，也不需要关闭 Dash to Panel 的窗口预览。
 
@@ -32,19 +40,7 @@ cd gnome-shell-layout-safe-window-anim
 
 X11 下修改扩展代码后，可以使用 Alt+F2，输入 `r`，回车，重新加载 GNOME Shell。Wayland 下不要强制杀 Shell；需要重新加载代码时注销并重新登录。
 
-## 问题再次出现时
-
-先重新加载扩展：
-
-```bash
-./repair-window-animation.sh
-```
-
-如果当前是 X11，仍然出现异常，再执行：
-
-```bash
-./repair-window-animation.sh --restart-x11
-```
+## 排查
 
 查看扩展状态和错误：
 
@@ -77,7 +73,6 @@ rm -r ~/.local/share/gnome-shell/extensions/layout-safe-window-anim@local
 ## 注意事项
 
 - 这是针对 GNOME 42 内部 API 的运行时补丁，不是对 Mutter 系统文件的修改；
-- 不要在 Wayland 会话中执行 `--restart-x11`；
 - 如果 GNOME 升级后扩展报错，应先禁用扩展并重新检查对应版本的 `windowManager.js`；
 - 扩展只解决这类窗口动画时序问题，不能作为其他桌面问题的通用修复器。
 
@@ -90,19 +85,13 @@ MIT License。见 [LICENSE](LICENSE)。
 `extension.js` 顶部：
 
 ```js
-// 最小化动画"结束时"窗口的缩放系数：越小，窗口在消失前收得越紧。
-// 只作用于 minimize 方向（还原动画不受影响）。
+// 最小化结束时，在 GNOME 原有缩放（缩到任务栏图标大小）的基础上再乘的系数：越小收得越紧
 const MINIMIZE_END_SCALE = 0.6;
-
-// 最小化落点的横向修正：Shell 给的落点偏图标左侧一点，正值把它往右挪。
+// 最小化落点的横向修正（像素）：GNOME 给的落点偏图标左侧，正值往右挪
 const MINIMIZE_END_OFFSET_X = 16;
 ```
 
-改完重启 GNOME Shell 生效：
-
-```bash
-kill -TERM $(systemctl --user show org.gnome.Shell@x11.service -p MainPID --value)
-```
+改完重启 GNOME Shell 生效：X11 下按 Alt+F2，输入 `r`，回车。
 
 说明：GNOME 会把每个窗口的结束尺寸按图标大小归一化（实测 900px 与 1750px 的窗口
 都缩到约 74px），所以落点修正只需要一个固定值，不需要按窗口宽度计算。
