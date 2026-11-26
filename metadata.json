@@ -1,9 +1,9 @@
 {
   "uuid": "layout-safe-window-anim@local",
   "name": "Layout Safe Window Animation",
-  "description": "Use transform translations for GNOME 42 minimize/restore movement",
+  "description": "Fix the GNOME 42 minimize/restore glitch: animate window movement with transform translations instead of layout x/y, so position and scale change in the same frame.",
   "shell-version": [
     "42"
   ],
-  "version": 2
+  "version": 3
 }
